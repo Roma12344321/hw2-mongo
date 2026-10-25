@@ -1,0 +1,12 @@
+# Сборочные артефакты
+/lab
+/bin/
+
+# macOS
+.DS_Store
+
+# Временные файлы результатов
+results/results.json.tmp
+
+.idea/
+.vscode/

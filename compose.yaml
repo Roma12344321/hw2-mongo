@@ -1,0 +1,53 @@
+name: hw2-mongo
+
+x-node: &node
+  image: mongo:8.0.30
+  command: [mongod, --replSet, hw2rs, --bind_ip_all, --wiredTigerCacheSizeGB, '0.25']
+  healthcheck:
+    test: [CMD, mongosh, --quiet, --eval, 'quit(db.adminCommand({ping:1}).ok ? 0 : 1)']
+    interval: 3s
+    timeout: 10s
+    retries: 40
+
+services:
+  m1:
+    <<: *node
+    volumes: [data_m1:/data/db]
+  m2:
+    <<: *node
+    volumes: [data_m2:/data/db]
+  m3:
+    <<: *node
+    volumes: [data_m3:/data/db]
+
+  init:
+    image: mongo:8.0.30
+    depends_on:
+      m1: {condition: service_healthy}
+      m2: {condition: service_healthy}
+      m3: {condition: service_healthy}
+    volumes: [./deploy:/work:ro]
+    entrypoint: [mongosh, 'mongodb://m1:27017/admin?directConnection=true', --quiet, --file, /work/init.js]
+    restart: 'no'
+
+  app:
+    build: .
+    profiles: [tools]
+    depends_on:
+      init: {condition: service_completed_successfully}
+    environment:
+      MONGODB_URI: 'mongodb://m1:27017,m2:27017,m3:27017/hw2?replicaSet=hw2rs&retryWrites=true&serverSelectionTimeoutMS=10000&readPreference=primary'
+      RESULTS_PATH: /out/results.json
+      LOGGER_FORMAT: console
+    volumes:
+      - ./results:/out
+    command: [help]
+
+volumes:
+  data_m1:
+  data_m2:
+  data_m3:
+
+networks:
+  default:
+    internal: true
